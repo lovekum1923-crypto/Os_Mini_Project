@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Job Scheduling System | C + WebAssembly Engine</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js CDN for Algorithm Comparison Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-info">
+          <h2>CoreSched</h2>
+          <span>C + WASM Engine</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="dashboard">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-section="add-jobs">
+          <span class="nav-icon">➕</span>
+          <span>Add Jobs</span>
+        </button>
+        <button class="nav-item" data-section="manage-jobs">
+          <span class="nav-icon">🗂️</span>
+          <span>Manage Jobs</span>
+          <span class="badge" id="nav-job-count">0</span>
+        </button>
+        <button class="nav-item" data-section="algorithms">
+          <span class="nav-icon">⚙️</span>
+          <span>Scheduling Algorithms</span>
+        </button>
+        <button class="nav-item" data-section="gantt-chart">
+          <span class="nav-icon">📈</span>
+          <span>Gantt Chart</span>
+        </button>
+        <button class="nav-item" data-section="performance">
+          <span class="nav-icon">⏱️</span>
+          <span>Performance Analysis</span>
+        </button>
+        <button class="nav-item" data-section="comparison">
+          <span class="nav-icon">⚖️</span>
+          <span>Algorithm Comparison</span>
+        </button>
+        <button class="nav-item" data-section="about">
+          <span class="nav-icon">📘</span>
+          <span>About Project</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="wasm-pill" id="wasm-status-pill">
+          <span class="status-dot loading" id="wasm-dot"></span>
+          <span id="wasm-status-text">Loading C WASM...</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-wrapper">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+          <div>
+            <h1 id="page-title">Dashboard</h1>
+            <p id="page-subtitle">Real-time CPU scheduling overview powered by native C &amp; WebAssembly</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="quick-algo-box">
+            <label for="global-algo-select">Active Engine:</label>
+            <select id="global-algo-select">
+              <option value="1">FCFS (First Come First Serve)</option>
+              <option value="2">SJF (Shortest Job First)</option>
+              <option value="3">Priority (Lower # = Higher)</option>
+              <option value="4">Round Robin (Quantum)</option>
+            </select>
+          </div>
+
+          <div class="quick-quantum-box" id="topbar-quantum-wrap" style="display: none;">
+            <label for="global-quantum-input">Q:</label>
+            <input type="number" id="global-quantum-input" min="1" max="50" value="2" />
+          </div>
+
+          <button class="btn btn-primary" id="btn-run-now">▶ Run C Scheduler</button>
+          <button class="btn btn-icon" id="theme-toggle" title="Toggle Light/Dark Mode">☀️</button>
+        </div>
+      </header>
+
+      <!-- Notification Banner -->
+      <div id="toast-container" class="toast-container"></div>
+
+      <!-- Content Area -->
+      <main class="content-area">
+
+        <!-- =========================================================
+             SECTION 1: DASHBOARD
+        ========================================================== -->
+        <section id="section-dashboard" class="page-section active">
+          <!-- 6 Required KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Total Jobs</span>
+                <span class="kpi-icon blue">📦</span>
+              </div>
+              <div class="kpi-value" id="kpi-total-jobs">0</div>
+              <div class="kpi-foot">Registered in queue</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Completed Jobs</span>
+                <span class="kpi-icon green">✅</span>
+              </div>
+              <div class="kpi-value" id="kpi-completed-jobs">0</div>
+              <div class="kpi-foot" id="kpi-algo-label">Executed via C Engine</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Pending Jobs</span>
+                <span class="kpi-icon amber">⏳</span>
+              </div>
+              <div class="kpi-value" id="kpi-pending-jobs">0</div>
+              <div class="kpi-foot">Awaiting execution</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Avg Waiting Time</span>
+                <span class="kpi-icon purple">⏲️</span>
+              </div>
+              <div class="kpi-value" id="kpi-avg-wt">0.00 <small>ms</small></div>
+              <div class="kpi-foot">TAT − Burst Time</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>Avg Turnaround Time</span>
+                <span class="kpi-icon cyan">🔄</span>
+              </div>
+              <div class="kpi-value" id="kpi-avg-tat">0.00 <small>ms</small></div>
+              <div class="kpi-foot">Completion − Arrival</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span>CPU Utilization</span>
+                <span class="kpi-icon emerald">⚡</span>
+              </div>
+              <div class="kpi-value" id="kpi-cpu-util">0.0%</div>
+              <div class="kpi-foot">Busy / Total Elapsed</div>
+            </div>
+          </div>
+
+          <!-- Smart Scheduling Advisory & Insights Panel -->
+          <div class="card smart-panel">
+            <div class="card-header">
+              <div>
+                <h3>🧠 Smart Scheduling Advisor &amp; Deadline Monitor</h3>
+                <p class="muted-text">Analyzes arrival patterns, burst variance, priority spread, and deadline urgency across all four C algorithms.</p>
+              </div>
+              <span class="info-pill">Advisory Engine</span>
+            </div>
+
+            <div class="smart-disclaimer">
+              <strong>Note on Scheduling Modes:</strong> The four core C algorithms (FCFS, SJF, Priority, Round Robin) execute strictly according to their classic OS rules. Deadlines are evaluated below as <em>post-execution SLA warnings and workload suitability recommendations</em> rather than Earliest Deadline First (EDF) preemption.
+            </div>
+
+            <div class="smart-grid">
+              <div class="smart-box">
+                <h4>🏆 Recommended Algorithm</h4>
+                <div class="rec-badge" id="smart-rec-algo">Evaluating...</div>
+                <p id="smart-rec-reason" class="smart-reason">Add jobs to receive workload-tailored recommendations.</p>
+              </div>
+
+              <div class="smart-box">
+                <h4>🚨 Approaching &amp; Missed Deadlines</h4>
+                <div id="smart-deadline-list" class="deadline-list">
+                  <p class="muted-text">No deadline alerts detected.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboard Live Preview: Mini Gantt + Quick Table -->
+          <div class="dashboard-split">
+            <div class="card">
+              <div class="card-header">
+                <h3>Execution Timeline Preview (C Engine Output)</h3>
+                <button class="btn btn-sm btn-outline" data-jump="gantt-chart">Expand Gantt →</button>
+              </div>
+              <div id="dashboard-gantt-preview" class="gantt-container"></div>
+              <div id="dashboard-gantt-axis" class="gantt-axis"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>Quick Job Summary</h3>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline" id="btn-load-sample">Load Sample Dataset</button>
+                  <button class="btn btn-sm btn-outline" data-jump="add-jobs">+ Add Job</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Job Name</th>
+                      <th>Arrival</th>
+                      <th>Burst</th>
+                      <th>Priority</th>
+                      <th>Deadline</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-jobs-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 2: ADD JOBS
+        ========================================================== -->
+        <section id="section-add-jobs" class="page-section">
+          <div class="card form-card">
+            <div class="card-header">
+              <div>
+                <h3 id="job-form-title">➕ Add New Job to Scheduler Queue</h3>
+                <p class="muted-text">Priority Convention: <strong>Lower number = Higher priority</strong> (1 = Critical, 10 = Low).</p>
+              </div>
+              <button class="btn btn-sm btn-outline" id="btn-reset-form">Clear Form</button>
+            </div>
+
+            <form id="job-form" novalidate>
+              <input type="hidden" id="edit-mode-original-id" value="" />
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="job-id">Job ID (Unique Integer) *</label>
+                  <input type="number" id="job-id" min="1" step="1" placeholder="e.g., 101" required />
+                  <small class="error-msg" id="err-job-id"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="job-name">Job Name *</label>
+                  <input type="text" id="job-name" maxlength="40" placeholder="e.g., Video Encoding Task" required />
+                  <small class="error-msg" id="err-job-name"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="job-arrival">Arrival Time (≥ 0) *</label>
+                  <input type="number" id="job-arrival" min="0" step="1" value="0" required />
+                  <small class="error-msg" id="err-job-arrival"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="job-burst">Burst Time (&gt; 0) *</label>
+                  <input type="number" id="job-burst" min="1" step="1" placeholder="e.g., 5" required />
+                  <small class="error-msg" id="err-job-burst"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="job-priority">Priority (1 = Highest) *</label>
+                  <input type="number" id="job-priority" min="1" max="100" step="1" value="3" required />
+                  <small class="error-msg" id="err-job-priority"></small>
+                </div>
+
+                <div class="form-group">
+                  <label for="job-deadline">Deadline (Time Unit ≥ Arrival) *</label>
+                  <input type="number" id="job-deadline" min="1" step="1" placeholder="e.g., 15" required />
+                  <small class="error-msg" id="err-job-deadline"></small>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="btn-submit-job">Save Job &amp; Schedule</button>
+                <button type="button" class="btn btn-outline" id="btn-cancel-edit" style="display: none;">Cancel Edit</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 3: MANAGE JOBS
+        ========================================================== -->
+        <section id="section-manage-jobs" class="page-section">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>🗂️ Job Queue Management</h3>
+                <p class="muted-text">Edit parameters or remove jobs. Changes automatically re-trigger the C WebAssembly scheduler.</p>
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-outline" id="btn-load-sample-2">Reset to Sample Jobs</button>
+                <button class="btn btn-sm btn-danger" id="btn-clear-all-jobs">Delete All Jobs</button>
+                <button class="btn btn-sm btn-primary" data-jump="add-jobs">+ Add New Job</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Job ID</th>
+                    <th>Job Name</th>
+                    <th>Arrival Time</th>
+                    <th>Burst Time</th>
+                    <th>Priority <small>(1=High)</small></th>
+                    <th>Deadline</th>
+                    <th>Deadline Health</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="manage-jobs-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 4: SCHEDULING ALGORITHMS
+        ========================================================== -->
+        <section id="section-algorithms" class="page-section">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>⚙️ Select &amp; Configure C Scheduling Algorithm</h3>
+                <p class="muted-text">All scheduling logic executes natively inside <code>scheduler.c</code> compiled to WebAssembly.</p>
+              </div>
+            </div>
+
+            <div class="algo-cards-grid">
+              <div class="algo-card selected" data-algo="1">
+                <div class="algo-card-top">
+                  <h4>1. First Come First Serve (FCFS)</h4>
+                  <span class="tag">Non-Preemptive</span>
+                </div>
+                <p>Dispatches jobs strictly in order of arrival time. Simple and fair in arrival order, though long CPU bursts can delay shorter waiting jobs (convoy effect).</p>
+                <button class="btn btn-sm btn-primary select-algo-btn" data-algo="1">Run FCFS</button>
+              </div>
+
+              <div class="algo-card" data-algo="2">
+                <div class="algo-card-top">
+                  <h4>2. Shortest Job First (SJF)</h4>
+                  <span class="tag">Non-Preemptive</span>
+                </div>
+                <p>Selects the ready job with the smallest CPU burst time. Provably minimizes average waiting time for non-preemptive workloads.</p>
+                <button class="btn btn-sm btn-outline select-algo-btn" data-algo="2">Run SJF</button>
+              </div>
+
+              <div class="algo-card" data-algo="3">
+                <div class="algo-card-top">
+                  <h4>3. Priority Scheduling</h4>
+                  <span class="tag">Non-Preemptive</span>
+                </div>
+                <p>Executes the ready job with the highest priority rank. <strong>Convention:</strong> Lower priority integer indicates higher urgency (Priority 1 executes before Priority 5).</p>
+                <button class="btn btn-sm btn-outline select-algo-btn" data-algo="3">Run Priority</button>
+              </div>
+
+              <div class="algo-card" data-algo="4">
+                <div class="algo-card-top">
+                  <h4>4. Round Robin (RR)</h4>
+                  <span class="tag">Preemptive</span>
+                </div>
+                <p>Cycles through ready jobs in a FIFO queue, granting each job up to one Time Quantum per turn. Ideal for interactive responsiveness.</p>
+                <div class="rr-control-row">
+                  <label for="algo-quantum-input">Time Quantum:</label>
+                  <input type="number" id="algo-quantum-input" min="1" max="50" value="2" />
+                  <button class="btn btn-sm btn-outline select-algo-btn" data-algo="4">Run Round Robin</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 5: GANTT CHART
+        ========================================================== -->
+        <section id="section-gantt-chart" class="page-section">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>📈 Interactive CPU Execution Gantt Chart</h3>
+                <p class="muted-text" id="gantt-subtitle">Generated directly from the C WebAssembly execution sequence.</p>
+              </div>
+              <div class="gantt-legend" id="gantt-legend"></div>
+            </div>
+
+            <div class="gantt-wrapper">
+              <div id="full-gantt-bar" class="gantt-container large"></div>
+              <div id="full-gantt-axis" class="gantt-axis"></div>
+            </div>
+
+            <div class="gantt-inspector" id="gantt-inspector">
+              Hover or click any execution block above to inspect exact start time, end time, duration, and job details.
+            </div>
+
+            <h4 class="sub-heading">Execution Sequence Log (Returned by <code>scheduler.c</code>)</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Slice #</th>
+                    <th>Job / State</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Execution Duration</th>
+                  </tr>
+                </thead>
+                <tbody id="gantt-sequence-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 6: PERFORMANCE ANALYSIS
+        ========================================================== -->
+        <section id="section-performance" class="page-section">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>⏱️ Detailed Job-Level Performance Metrics</h3>
+                <p class="muted-text" id="perf-algo-heading">Metrics computed inside C engine</p>
+              </div>
+            </div>
+
+            <div class="formula-bar">
+              <span><strong>Turnaround Time (TAT)</strong> = Completion − Arrival</span>
+              <span><strong>Waiting Time (WT)</strong> = TAT − Burst</span>
+              <span><strong>Response Time (RT)</strong> = First Start − Arrival</span>
+              <span><strong>CPU Utilization</strong> = (Total Busy / Total Elapsed) × 100</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Job ID</th>
+                    <th>Job Name</th>
+                    <th>Arrival</th>
+                    <th>Burst</th>
+                    <th>Priority</th>
+                    <th>Completion Time</th>
+                    <th>Turnaround Time</th>
+                    <th>Waiting Time</th>
+                    <th>Response Time</th>
+                    <th>Deadline Status</th>
+                  </tr>
+                </thead>
+                <tbody id="performance-tbody"></tbody>
+                <tfoot id="performance-tfoot"></tfoot>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 7: ALGORITHM COMPARISON
+        ========================================================== -->
+        <section id="section-comparison" class="page-section">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>⚖️ Multi-Algorithm Benchmark (Executed via C Engine)</h3>
+                <p class="muted-text">All four algorithms are run on the current job dataset inside <code>scheduler.c</code> to compare real performance.</p>
+              </div>
+              <button class="btn btn-sm btn-primary" id="btn-refresh-comparison">↻ Re-Benchmark All 4 in C</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Algorithm</th>
+                    <th>Avg Waiting Time</th>
+                    <th>Avg Turnaround Time</th>
+                    <th>Avg Response Time</th>
+                    <th>CPU Utilization</th>
+                    <th>Deadlines Met</th>
+                  </tr>
+                </thead>
+                <tbody id="comparison-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="charts-grid">
+              <div class="chart-box">
+                <h4>Time Metrics Comparison (Lower is Better)</h4>
+                <canvas id="timeComparisonChart"></canvas>
+              </div>
+              <div class="chart-box">
+                <h4>CPU Utilization % (Higher is Better)</h4>
+                <canvas id="utilComparisonChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION 8: ABOUT PROJECT
+        ========================================================== -->
+        <section id="section-about" class="page-section">
+          <div class="card about-card">
+            <h3>📘 About Smart Job Scheduling System</h3>
+            <p>
+              This application demonstrates an authentic hybrid web architecture combining a responsive <strong>HTML5 / CSS3 / JavaScript</strong> user interface with a high-performance <strong>C language scheduling engine</strong> compiled to <strong>WebAssembly (WASM)</strong> via Emscripten.
+            </p>
+
+            <div class="about-grid">
+              <div class="about-block">
+                <h4>🏗️ Architecture &amp; Data Flow</h4>
+                <ul>
+                  <li><strong>Frontend (<code>index.html</code>, <code>style.css</code>, <code>script.js</code>):</strong> Manages job inputs, validation, linear WASM memory allocation, interactive Gantt visualization, and Chart.js benchmarking.</li>
+                  <li><strong>C Engine (<code>scheduler.c</code>):</strong> Receives raw job structs via WebAssembly heap pointers, executes FCFS, SJF, Priority, or Round Robin, and writes Gantt slices and performance metrics back to shared memory.</li>
+                </ul>
+              </div>
+
+              <div class="about-block">
+                <h4>📐 Mathematical Formulas Used</h4>
+                <ul>
+                  <li><strong>Turnaround Time:</strong> <code>Completion Time − Arrival Time</code></li>
+                  <li><strong>Waiting Time:</strong> <code>Turnaround Time − Burst Time</code></li>
+                  <li><strong>Response Time:</strong> <code>First Start Time − Arrival Time</code></li>
+                  <li><strong>CPU Utilization:</strong> <code>(Total CPU Busy Time / Total Elapsed Time) × 100</code></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Emscripten-generated WebAssembly loader (optional; JS fallback is built in) -->
+  <script src="scheduler.js" onerror="console.warn('scheduler.js not found; using built-in JS scheduler fallback.')"></script>
+  <!-- Frontend Application Controller -->
+  <script src="script.js"></script>
+</body>
+</html>
